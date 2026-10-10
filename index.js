@@ -26,10 +26,24 @@ async function run() {
   try {
     await client.connect();
     const db = client.db("bistroDB"); 
+    const usersCollection = db.collection('users');
     const reviewsCollection = db.collection('reviews');
     const menuCollection = db.collection('menu')
     const cartsCollection = db.collection('carts')
     console.log('connected to mongo db');
+
+    // User related api
+    app.post('/users', async(req, res)=>{
+      const newUser = req.body;
+      const result = await usersCollection.insertOne(newUser);
+      res.send(result)
+    });
+
+    app.get('/users', async(req, res)=>{
+      const result = await usersCollection.find().toArray();
+      res.send(result)
+    })
+
 
    app.get('/menu', async(req, res)=>{
     const result = await menuCollection.find().toArray();
