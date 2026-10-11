@@ -1,9 +1,9 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
-
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
- require('dotenv').config()
+require("dotenv").config();
 const port = process.env.PORT || 5000;
 
 // middlewares
@@ -18,73 +18,93 @@ const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
-    deprecationErrors: true
-  }
+    deprecationErrors: true,
+  },
 });
 
 async function run() {
   try {
     await client.connect();
-    const db = client.db("bistroDB"); 
-    const usersCollection = db.collection('users');
-    const reviewsCollection = db.collection('reviews');
-    const menuCollection = db.collection('menu')
-    const cartsCollection = db.collection('carts')
-    console.log('connected to mongo db');
+    const db = client.db("bistroDB");
+    const usersCollection = db.collection("users");
+    const reviewsCollection = db.collection("reviews");
+    const menuCollection = db.collection("menu");
+    const cartsCollection = db.collection("carts");
+    console.log("connected to mongo db");
+
+    // jwt related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.JWT_ACCESS_SECRET, {
+        expiresIn: "1h",
+      });
+
+      res.send({ token });
+    });
 
     // User related api
-    app.post('/users', async(req, res)=>{
+    app.post("/users", async (req, res) => {
       const user = req.body;
-      const query = {email: user.email};
+      const query = { email: user.email };
       const isUserExist = await usersCollection.findOne(query);
-      if(isUserExist){
-        return res.send({message: "User already exist", insertedId: null})
+      if (isUserExist) {
+        return res.send({ message: "User already exist", insertedId: null });
       }
       const result = await usersCollection.insertOne(user);
-      res.send(result)
+      res.send(result);
     });
 
-    app.get('/users', async(req, res)=>{
+    app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
-      res.send(result)
+      res.send(result);
     });
 
-    app.delete('/users/:id', async(req, res)=>{
+    app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
+      const updatedUser = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedUser);
+      res.send(result);
+    });
+
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
-      res.send(result)
-    })
+      res.send(result);
+    });
 
-
-   app.get('/menu', async(req, res)=>{
-    const result = await menuCollection.find().toArray();
-    res.send(result)
-   })
-   app.get('/review', async(req, res)=>{
-    const result = await reviewsCollection.find().toArray();
-    res.send(result)
-   });
-  //  carts collection
-  // create a cart
-  app.post('/carts', async(req, res)=>{
-    const cartItem = req.body;
-    const result = await cartsCollection.insertOne(cartItem);
-    res.send(result);
-  }) ;
-  // get all carts
-  app.get('/carts', async(req, res)=>{
-    const result = await cartsCollection.find().toArray();
-    res.send(result);
-  });
-  // delete single cart
-  app.delete('/carts/:id', async(req, res)=>{
-    const id = req.params.id;
-    const query = {_id : new ObjectId(id)}
-    const result = await cartsCollection.deleteOne(query);
-    res.send(result)
-  })
-
+    app.get("/menu", async (req, res) => {
+      const result = await menuCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/review", async (req, res) => {
+      const result = await reviewsCollection.find().toArray();
+      res.send(result);
+    });
+    //  carts collection
+    // create a cart
+    app.post("/carts", async (req, res) => {
+      const cartItem = req.body;
+      const result = await cartsCollection.insertOne(cartItem);
+      res.send(result);
+    });
+    // get all carts
+    app.get("/carts", async (req, res) => {
+      const result = await cartsCollection.find().toArray();
+      res.send(result);
+    });
+    // delete single cart
+    app.delete("/carts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await cartsCollection.deleteOne(query);
+      res.send(result);
+    });
   } finally {
   }
 }
@@ -93,7 +113,6 @@ run().catch(console.dir);
 // basic route
 app.get("/", (req, res) => {
   res.send("bistro bossssssssssss");
-  
 });
 
 app.listen(port, () => {
