@@ -124,7 +124,12 @@ const verifyAdmin = async(req, res, next)=>{
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
-    
+    app.get('/menu/:id', async(req, res)=>{
+      const id = req.params.id;
+      const filter = {_id: id};
+      const result = await menuCollection.findOne(filter);
+      res.send(result);
+    })
     app.post('/menu', async(req, res)=>{
       const  menu = req.body;
       const result = await menuCollection.insertOne(menu);
