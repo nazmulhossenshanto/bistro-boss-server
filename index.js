@@ -182,7 +182,7 @@ const verifyAdmin = async(req, res, next)=>{
 run().catch(console.dir);
 // basic route
 app.get("/", (req, res) => {
-  res.send("bistro bossssssssssss");
+  res.status(200).send({message :  `Your Bistro boss server is running on port ${port}`});
 });
 
 app.listen(port, () => {
