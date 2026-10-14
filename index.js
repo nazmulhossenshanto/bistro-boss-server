@@ -101,7 +101,7 @@ const verifyAdmin = async(req, res, next)=>{
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", async (req, res) => {
+    app.patch("/users/admin/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedUser = {
@@ -113,7 +113,7 @@ const verifyAdmin = async(req, res, next)=>{
       res.send(result);
     });
 
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
@@ -124,6 +124,17 @@ const verifyAdmin = async(req, res, next)=>{
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
+    app.post('/menu', async(req, res)=>{
+      const  menu = req.body;
+      const result = await menuCollection.insertOne(menu);
+      res.send(result)
+    });
+    app.delete('/menu/:id', async(req, res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await menuCollection.deleteOne(query);
+      res.send(result)
+    })
     app.get("/review", async (req, res) => {
       const result = await reviewsCollection.find().toArray();
       res.send(result);
