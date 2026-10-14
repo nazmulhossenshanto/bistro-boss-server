@@ -124,15 +124,27 @@ const verifyAdmin = async(req, res, next)=>{
       const result = await menuCollection.find().toArray();
       res.send(result);
     });
+    
     app.post('/menu', async(req, res)=>{
       const  menu = req.body;
       const result = await menuCollection.insertOne(menu);
       res.send(result)
     });
-    app.delete('/menu/:id', async(req, res)=>{
+
+    app.patch('/menu/:id', async(req, res)=>{
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
-      const result = await menuCollection.deleteOne(query);
+      const filter = {_id: id};
+      const item = req.body;
+      const updatedDoc = {
+        $set: item
+      }
+      const result = await menuCollection.updateOne(filter, updatedDoc);
+      res.send(result)
+    })
+    app.delete('/menu/:id', async(req, res)=>{
+      const id = req.params.id; 
+      const query = {_id: id}; 
+      const result = await menuCollection.deleteOne(query); 
       res.send(result)
     })
     app.get("/review", async (req, res) => {
