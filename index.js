@@ -1,9 +1,12 @@
+require("dotenv").config();
+
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken"); 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-require("dotenv").config();
+
 const port = process.env.PORT || 5000;
 
 // middlewares
@@ -37,26 +40,30 @@ async function run() {
     app.post("/jwt", async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.JWT_ACCESS_SECRET, {
-        expiresIn: "1h",
+        expiresIn: "7d",
       });
 
       res.send({ token });
     });
     // jwt verify token 
-    const verifyToken = (req, res, next)=>{
-      if(!req.headers.authorization){
-        return res.status(401).send({message: "Access forbiddern"})
-      };
-      const token = req.headers.authorization.split(' ')[1];
-      jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded)=>{
-        if(err){
-          return res.status(401).send({message: "Access forbiddern"})
-        }
-        req.decoded = decoded;
-        console.log('decoded from', decoded);
-        next()
+   const verifyToken = (req, res , next)=>{
+    const authHeader = req.headers.authorization;
+    if(!authHeader.startsWith("Bearer")){
+      return res.status(401).send({
+        message: "Unauthorized access"
       })
-    }
+    };
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded)=>{
+      if(err){
+        return res.status(401).send({
+          message: "Invalid or expired token"
+        })
+      };
+      req.decoded = decoded;
+      next()
+    })
+   }
 // verify admin after verifyToken
 const verifyAdmin = async(req, res, next)=>{
   const email = req.decoded.email;
@@ -81,7 +88,45 @@ const verifyAdmin = async(req, res, next)=>{
         admin = user?.role === 'admin';
       };
       res.send({admin})
-    })
+    });
+
+    // stripe payment api 
+   
+app.post("/create-payment-intent", async (req, res) => {
+  try {
+    console.log("Payment request body:", req.body);
+
+    const price = Number(req.body.price);
+
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).send({
+        message: "Invalid payment amount",
+        receivedPrice: req.body.price,
+      });
+    }
+
+    const amount = Math.round(price * 100);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: "usd",
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    res.send({
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    console.error("Payment Intent Error:", error.message);
+
+    res.status(500).send({
+      message: "Payment setup failed",
+    });
+  }
+});
+
 
     // User related api
     app.post("/users", async (req, res) => {
@@ -159,14 +204,28 @@ const verifyAdmin = async(req, res, next)=>{
     //  carts collection
     // create a cart
     app.post("/carts", async (req, res) => {
-      const cartItem = req.body;
+      const item = req.body;
+      const email = req.decoded.email;
+      const cartItem = {
+        ...item, email
+      }
       const result = await cartsCollection.insertOne(cartItem);
       res.send(result);
     });
     // get all carts
-    app.get("/carts", async (req, res) => {
-      const result = await cartsCollection.find().toArray();
-      res.send(result);
+    app.get("/carts",verifyToken, async (req, res) => {
+      try {
+        const email = req.decoded.email;
+        const result = await cartsCollection.find({email: email}).toArray();
+        res.send(result)
+        
+      } catch (error) {
+        console.error("Failed to fetch cart:", error);
+    res.status(500).send({
+      message: "Failed to fetch cart items",
+    });
+
+      }
     });
     // delete single cart
     app.delete("/carts/:id", async (req, res) => {
