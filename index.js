@@ -25,6 +25,13 @@ const client = new MongoClient(uri, {
   },
 });
 
+// basic route
+app.get("/", (req, res) => {
+  res.status(200).send({
+    message: "Bistro Boss server is running",
+  });
+});
+
 async function run() {
   try {
     await client.connect();
@@ -46,24 +53,34 @@ async function run() {
       res.send({ token });
     });
     // jwt verify token 
-   const verifyToken = (req, res , next)=>{
-    const authHeader = req.headers.authorization;
-    if(!authHeader.startsWith("Bearer")){
-      return res.status(401).send({
-        message: "Unauthorized access"
-      })
-    };
-    const token = authHeader.split(' ')[1];
-    jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded)=>{
-      if(err){
+    
+const verifyToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).send({
+      message: "Authentication token required",
+    });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(
+    token,
+    process.env.JWT_ACCESS_SECRET,
+    (err, decoded) => {
+      if (err || !decoded?.email) {
         return res.status(401).send({
-          message: "Invalid or expired token"
-        })
-      };
+          message: "Invalid or expired token",
+        });
+      }
+
       req.decoded = decoded;
-      next()
-    })
-   }
+      next();
+    }
+  );
+};
+
 // verify admin after verifyToken
 const verifyAdmin = async(req, res, next)=>{
   const email = req.decoded.email;
@@ -203,47 +220,78 @@ app.post("/create-payment-intent", async (req, res) => {
     });
     //  carts collection
     // create a cart
-    app.post("/carts", async (req, res) => {
-      const item = req.body;
-      const email = req.decoded.email;
-      const cartItem = {
-        ...item, email
-      }
-      const result = await cartsCollection.insertOne(cartItem);
-      res.send(result);
-    });
-    // get all carts
-    app.get("/carts",verifyToken, async (req, res) => {
-      try {
-        const email = req.decoded.email;
-        const result = await cartsCollection.find({email: email}).toArray();
-        res.send(result)
-        
-      } catch (error) {
-        console.error("Failed to fetch cart:", error);
+    app.post("/carts", verifyToken, async (req, res) => {
+  try {
+    const item = req.body; 
+    const email = req.decoded.email;
+
+    const cartItem = {
+      ...item,
+      email,
+    };
+
+    const result = await cartsCollection.insertOne(cartItem);
+
+    res.status(201).send(result);
+  } catch (error) {
+    console.error("Add cart failed:", error);
+
     res.status(500).send({
-      message: "Failed to fetch cart items",
+      message: "Failed to add cart item",
+    });
+  }
+});
+    // get all carts
+   app.get("/carts", verifyToken, async (req, res) => {
+  try {
+    const result = await cartsCollection
+      .find({ email: req.decoded.email })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error("Fetch cart failed:", error);
+
+    res.status(500).send({
+      message: "Failed to fetch cart",
+    });
+  }
+});
+    // delete single cart
+   app.delete("/carts/:id", verifyToken, async (req, res) => {
+  try {
+    
+    const result = await cartsCollection.deleteOne({
+      _id: new ObjectId(req.params.id),
+      email: req.decoded.email,
     });
 
-      }
+    if (result.deletedCount === 0) {
+      return res.status(404).send({
+        message: "Cart item not found",
+      });
+    }
+
+    res.send(result);
+  } catch (error) {
+    console.error("Delete cart failed:", error);
+
+    res.status(500).send({
+      message: "Failed to delete cart item",
     });
-    // delete single cart
-    app.delete("/carts/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await cartsCollection.deleteOne(query);
-      res.send(result);
-    });
-  } finally {
+  }
+});
+
+    app.listen(port, () => {
+  console.log(`your server is running on port ${port}`);
+});
+
+  } 
+  finally {
   }
 }
 
 run().catch(console.dir);
-// basic route
-app.get("/", (req, res) => {
-  res.status(200).send({message :  `Your Bistro boss server is running on port ${port}`});
-});
 
-app.listen(port, () => {
-  console.log(`your server is running on port ${port}`);
-});
+
+
