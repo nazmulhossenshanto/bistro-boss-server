@@ -40,6 +40,7 @@ async function run() {
     const reviewsCollection = db.collection("reviews");
     const menuCollection = db.collection("menu");
     const cartsCollection = db.collection("carts");
+    const paymentsCollection = db.collection("payments");
     console.log("connected to mongo db");
 
     // jwt related api
@@ -281,6 +282,37 @@ app.post("/create-payment-intent", async (req, res) => {
     });
   }
 });
+
+
+// Payment related api :
+app.post('/payments',verifyToken,  async(req, res)=>{ 
+  try {
+    const payment = req.body;
+    const paymentResult = await paymentsCollection.insertOne(payment);
+    const query = {_id: {
+      $in: payment.cartIds.map(id=> new ObjectId(id))
+    }};
+
+    const deleteResult = await cartsCollection.deleteMany(query);
+    
+    res.send({paymentResult, deleteResult})
+  
+    
+  } catch (error) {
+    console.log('payment error ', error);
+      res.status(500).send({message : "Cannot payment"})
+  }
+});
+
+app.get('/payments',verifyToken, async(req, res)=>{
+  const email = req.query.email;
+  const payments = await paymentsCollection.find({email: email}).toArray();
+  res.send(payments)
+})
+
+// app.get('/payment-stats', async (req, res)=>{
+//   const 
+// })
 
     app.listen(port, () => {
   console.log(`your server is running on port ${port}`);
